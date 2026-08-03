@@ -8,7 +8,7 @@
  * ZMK simply has no equivalent concept here, so there was nothing to "convert",
  * it's just omitted.
  *
- * Layer order: 0 base, 1 gaming, 2 sym, 3 uml, 4 nav, 5 gaming_nav, 6 settings
+ * Layer order: 0 base, 1 sym, 2 uml, 3 nav, 4 settings
  *
  * Modifier notes (kept 1:1 with the QMK source, since the actual German
  * characters come from your OS keyboard layout, not the firmware):
@@ -32,13 +32,18 @@
 
 / {
     macros {
-        settings_layer_toggle: settings_layer_toggle {
+        settings_enter: settings_enter {
             compatible = "zmk,behavior-macro";
             #binding-cells = <0>;
-            // Toggling RGB and the layer together on the same key press keeps
-            // them in lockstep: enter the layer -> RGB on, leave it -> RGB off.
-            // No custom module needed - both are stock ZMK behaviors.
-            bindings = <&rgb_ug RGB_TOG>, <&tog 6>;
+            // Explicitly turn RGB ON and go to the settings layer
+            bindings = <&rgb_ug RGB_ON>, <&to 4>;
+        };
+
+        settings_exit: settings_exit {
+            compatible = "zmk,behavior-macro";
+            #binding-cells = <0>;
+            // Explicitly turn RGB OFF and return to the base layer
+            bindings = <&rgb_ug RGB_OFF>, <&to 0>;
         };
     };
 };
@@ -47,25 +52,13 @@
     combos {
         compatible = "zmk,combos";
 
-        // Same as QMK's combo_gaming_toggle -> GAMING_TOGGLE.
-        // Short 25ms term like get_combo_term() gave it in QMK, so fast alternating
-        // shift presses while typing capitals don't trigger it by accident.
-        combo_gaming_toggle {
-            timeout-ms = <25>;
-            key-positions = <28 39>;
-            bindings = <&tog 1>;
-            layers = <0 1>;
-        };
-
         // Hold TAB+ENT together to reach a small settings layer with BT
-        // profile selection / bootloader / reset. Also flips all LEDs on/off
-        // via the settings_layer_toggle macro above, since there's no
-        // display to show which layer/profile is active otherwise.
+        // profile selection / bootloader / reset. Also turns LEDs on.
         combo_settings_layer {
             timeout-ms = <50>;
             key-positions = <0 43>;
-            bindings = <&settings_layer_toggle>;
-            layers = <0 1>;
+            bindings = <&settings_enter>;
+            layers = <0 4>;
         };
     };
 
@@ -83,22 +76,9 @@
                 &kp TAB   &kp Q &kp W &kp E &kp R &kp T &kp LGUI    &kp PSCRN &kp Y &kp U &kp I     &kp O   &kp P    &kp BSPC
                 &kp LCTRL &kp A &kp S &kp D &kp F &kp G &kp DEL     &kp DEL   &kp H &kp J &kp K     &kp L   &kp NUHS &kp MINUS
                 &kp LSHFT &kp Z &kp X &kp C &kp V &kp B                      &kp N &kp M &kp COMMA &kp DOT &kp FSLH &kp RSHFT
-                                      &kp LALT &sl 4 &kp SPACE               &kp RET &sl 3 &sl 2
+                                      &kp LALT &sl 3 &kp SPACE               &kp RET &sl 2 &sl 1
             >;
             sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &inc_dec_kp PG_UP PG_DN &inc_dec_kp C_PREV C_NEXT &inc_dec_kp C_VOL_DN C_VOL_UP>;
-        };
-
-        gaming_layer {
-            display-name = "GAMING";
-            // Same as base, but LGUI/ESC and DEL/LGUI swap places (so GUI doesn't
-            // get hit by accident mid-game), and the nav thumb key is momentary
-            // instead of one-shot (MO instead of OSL, matching the QMK source).
-            bindings = <
-                &kp TAB   &kp Q &kp W &kp E &kp R &kp T &kp ESC     &kp PSCRN &kp Y &kp U &kp I     &kp O   &kp P    &kp BSPC
-                &kp LCTRL &kp A &kp S &kp D &kp F &kp G &kp LGUI    &kp DEL   &kp H &kp J &kp K     &kp L   &kp NUHS &kp MINUS
-                &kp LSHFT &kp Z &kp X &kp C &kp V &kp B                      &kp N &kp M &kp COMMA &kp DOT &kp FSLH &kp RSHFT
-                                      &kp LALT &mo 5 &kp SPACE              &kp RET &sl 3 &sl 2
-            >;
         };
 
         sym_layer {
@@ -134,28 +114,16 @@
             >;
         };
 
-        gaming_nav_layer {
-            display-name = "GAMING NAV";
-            // Same shape as nav_layer, but Ctrl-based shortcuts swapped for Shift
-            // (WASD-friendly) versions, same as QMK _GAMING_NAV.
-            bindings = <
-                &kp ESC &none      &kp HOME &kp UP   &kp END   &kp LS(T) &none        &none         &none      &kp N7   &kp N8   &kp N9   &kp LS(N0)   &trans
-                &trans  &kp LS(A)  &kp LEFT &kp DOWN &kp RIGHT &kp PG_UP &none        &none         &none      &kp N4   &kp N5   &kp N6   &kp KP_PLUS  &kp KP_MULTIPLY
-                &trans  &none      &kp LS(X) &kp INS  &kp DEL   &kp PG_DN                  &kp COMMA  &kp N1   &kp N2   &kp N3   &kp KP_MINUS &kp KP_DIVIDE
-                                    &none &trans &none                     &none &kp N0 &kp DOT
-            >;
-        };
-
         settings_layer {
             display-name = "SETTINGS";
             // Not present in the QMK source - ZMK needs somewhere to put BT
             // profile switching / bootloader / factory reset. Reached by holding
             // both thumb layer keys together (see combo_settings_layer above).
             bindings = <
-                &kp ESC &none       &none       &none       &none       &none &bootloader      &none &none &none &none &none &none &none
-                &none &bt BT_SEL 0 &bt BT_SEL 1 &bt BT_SEL 2 &bt BT_SEL 3 &bt BT_SEL 4 &sys_reset      &none &none &none &none &none &none &none
-                &none &bt BT_CLR  &none       &none       &none       &none                &none &none &none &none &none &none
-                                    &none &none &none                  &kp RET &none &none
+                &settings_exit &none       &none       &none       &none       &none &bootloader      &none &none &none &none &none &none &none
+                &none          &bt BT_SEL 0 &bt BT_SEL 1 &bt BT_SEL 2 &bt BT_SEL 3 &bt BT_SEL 4 &sys_reset      &none &none &none &none &none &none &none
+                &none          &bt BT_CLR  &none       &none       &none       &none                &none &none &none &none &none &none
+                                    &none &none &none                  &none &none &none
             >;
         };
     };
