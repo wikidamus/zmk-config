@@ -2,6 +2,21 @@
  * Copyright (c) 2020 The ZMK Contributors
  *
  * SPDX-License-Identifier: MIT
+ *
+ * Ported from a QMK keymap.c (German ISO Corne Choc Pro, LAYOUT_split_3x6_3_ex2).
+ * All RGB matrix / underglow logic from the QMK source has been dropped -
+ * ZMK simply has no equivalent concept here, so there was nothing to "convert",
+ * it's just omitted.
+ *
+ * Layer order: 0 base, 1 gaming, 2 sym, 3 uml, 4 nav, 5 gaming_nav, 6 settings
+ *
+ * Modifier notes (kept 1:1 with the QMK source, since the actual German
+ * characters come from your OS keyboard layout, not the firmware):
+ *   QMK ALGR(kc)  -> ZMK RA(kc)   (right Alt / AltGr)
+ *   QMK LSFT(kc)  -> ZMK LS(kc)
+ *   QMK LCTL(kc)  -> ZMK LC(kc)
+ *   QMK SGUI(kc)  -> ZMK LG(LS(kc))   (Win+Shift)
+ *   QMK RCS(kc)   -> ZMK LC(LS(kc))   (Ctrl+Shift, e.g. "paste as text")
  */
 
 #include <behaviors.dtsi>
@@ -16,112 +31,131 @@
 };
 
 / {
+    macros {
+        settings_layer_toggle: settings_layer_toggle {
+            compatible = "zmk,behavior-macro";
+            #binding-cells = <0>;
+            // Toggling RGB and the layer together on the same key press keeps
+            // them in lockstep: enter the layer -> RGB on, leave it -> RGB off.
+            // No custom module needed - both are stock ZMK behaviors.
+            bindings = <&rgb_ug RGB_TOG>, <&tog 6>;
+        };
+    };
+};
+
+/ {
+    combos {
+        compatible = "zmk,combos";
+
+        // Same as QMK's combo_gaming_toggle -> GAMING_TOGGLE.
+        // Short 25ms term like get_combo_term() gave it in QMK, so fast alternating
+        // shift presses while typing capitals don't trigger it by accident.
+        combo_gaming_toggle {
+            timeout-ms = <25>;
+            key-positions = <28 39>;
+            bindings = <&tog 1>;
+            layers = <0 1>;
+        };
+
+        // Hold TAB+ENT together to reach a small settings layer with BT
+        // profile selection / bootloader / reset. Also flips all LEDs on/off
+        // via the settings_layer_toggle macro above, since there's no
+        // display to show which layer/profile is active otherwise.
+        combo_settings_layer {
+            timeout-ms = <50>;
+            key-positions = <0 43>;
+            bindings = <&settings_layer_toggle>;
+            layers = <0 1>;
+        };
+    };
+
     keymap {
         compatible = "zmk,keymap";
 
-        default_layer {
-            display-name = "QWERTY";
-            // --------------------------------------------------------------------------------
-            // |  TAB |  Q  |  W  |  E  |  R  |  T  |  MUTE |  PP   |  Y  |  U   |  I  |  O  |  P  | BSPC |
-            // | CTRL |  A  |  S  |  D  |  F  |  G  |  LALT |  RALT |  H  |  J   |  K  |  L  |  ;  |  '   |
-            // | SHFT |  Z  |  X  |  C  |  V  |  B  |               |  N  |  M   |  ,  |  .  |  /  | ESC  |
-            //                    | GUI | LWR | SPC |               | ENT | RSE  | ALT |
+        base_layer {
+            display-name = "BASE";
+            // -------------------------------------------------------------------------------------------------------------------
+            // | TAB  |  Q  |  W  |  E  |  R  |  T  | LGUI |  | PSCR |  Y  |  U  |  I  |  O  |  P    | BSPC  |
+            // | CTRL |  A  |  S  |  D  |  F  |  G  | DEL  |  | DEL  |  H  |  J  |  K  |  L  | NUHS  | MINUS |
+            // | SHFT |  Z  |  X  |  C  |  V  |  B  |             |  N  |  M  | ,   | .   | /     | SHFT  |
+            //                    | ALT | NAV | SPC |             | ENT | UML | SYM |
             bindings = <
-                &kp TAB   &kp Q &kp W &kp E &kp R &kp T &kp C_MUTE &kp C_PP &kp Y &kp U  &kp I     &kp O   &kp P    &kp BSPC
-                &kp LCTRL &kp A &kp S &kp D &kp F &kp G &kp LALT   &kp RALT &kp H &kp J  &kp K     &kp L   &kp SEMI &kp SQT
-                &kp LSHFT &kp Z &kp X &kp C &kp V &kp B                     &kp N &kp M  &kp COMMA &kp DOT &kp FSLH &kp ESC
-                                      &kp LGUI &mo 1 &kp SPACE              &kp RET &mo 2 &kp RALT
+                &kp TAB   &kp Q &kp W &kp E &kp R &kp T &kp LGUI    &kp PSCRN &kp Y &kp U &kp I     &kp O   &kp P    &kp BSPC
+                &kp LCTRL &kp A &kp S &kp D &kp F &kp G &kp DEL     &kp DEL   &kp H &kp J &kp K     &kp L   &kp NUHS &kp MINUS
+                &kp LSHFT &kp Z &kp X &kp C &kp V &kp B                      &kp N &kp M &kp COMMA &kp DOT &kp FSLH &kp RSHFT
+                                      &kp LALT &sl 4 &kp SPACE               &kp RET &sl 3 &sl 2
             >;
             sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &inc_dec_kp PG_UP PG_DN &inc_dec_kp C_PREV C_NEXT &inc_dec_kp C_VOL_DN C_VOL_UP>;
         };
 
-        lower_layer {
-            display-name = "NUMBER";
-            // -----------------------------------------------------------------------------------------
-            // |  TAB |  1  |  2  |  3  |  4  |  5    |  LCTRL | RCTRL |  6  |  7  |  8  |  9  |  0  | BSPC |
-            // | CTRL | BT1 | BT2 | BT3 | BT4 | BT5   |  LALT  | RALT  | LFT | DWN |  UP | RGT |     |      |
-            // | SHFT | BTCR| RGB | RST | BOOT| Unlock|        |       |     |     |     |     |     |      |
-            //                    | GUI |     | SPC   |        | ENT   |     | ALT |
+        gaming_layer {
+            display-name = "GAMING";
+            // Same as base, but LGUI/ESC and DEL/LGUI swap places (so GUI doesn't
+            // get hit by accident mid-game), and the nav thumb key is momentary
+            // instead of one-shot (MO instead of OSL, matching the QMK source).
             bindings = <
-                &kp TAB   &kp N1       &kp N2          &kp N3       &kp N4       &kp N5       &kp LCTRL &kp RCTRL &kp N6   &kp N7   &kp N8 &kp N9    &kp N0 &kp BSPC
-                &kp LCTRL &bt BT_SEL 0 &bt BT_SEL 1    &bt BT_SEL 2 &bt BT_SEL 3 &bt BT_SEL 4 &kp LALT  &kp RALT  &kp LEFT &kp DOWN &kp UP &kp RIGHT &trans &trans
-                &kp LSHFT &bt BT_CLR   &rgb_ug RGB_TOG &sys_reset   &bootloader  &studio_unlock                   &trans   &trans   &trans &trans    &trans &trans
-                                                       &kp LGUI     &trans       &kp SPACE                        &kp LGUI &trans   &kp SPACE
+                &kp TAB   &kp Q &kp W &kp E &kp R &kp T &kp ESC     &kp PSCRN &kp Y &kp U &kp I     &kp O   &kp P    &kp BSPC
+                &kp LCTRL &kp A &kp S &kp D &kp F &kp G &kp LGUI    &kp DEL   &kp H &kp J &kp K     &kp L   &kp NUHS &kp MINUS
+                &kp LSHFT &kp Z &kp X &kp C &kp V &kp B                      &kp N &kp M &kp COMMA &kp DOT &kp FSLH &kp RSHFT
+                                      &kp LALT &mo 5 &kp SPACE              &kp RET &sl 3 &sl 2
             >;
         };
 
-        raise_layer {
-            display-name = "SYMBOL";
-            // -----------------------------------------------------------------------------------------
-            // |  TAB |  !  |  @  |  #  |  $  |  %  | LCTRL | RCTRL |  ^  |  &  |  *  |  (  |  )  | BSPC |
-            // | CTRL | HUD | HUI |     |     |     |  LALT | RALT  |  -  |  =  |  [  |  ]  |  \  |  `   |
-            // | SHFT |     |     |     |     |     |               |  _  |  +  |  {  |  }  | "|" |  ~   |
-            //                    | GUI |     | SPC |               | ENT |     | ALT |
+        sym_layer {
+            display-name = "SYM";
+            // F-keys + shifted number row (symbols) + AltGr NUBS row, same as QMK _SYM.
             bindings = <
-                &kp  TAB  &kp EXCL        &kp AT          &kp HASH &kp DLLR &kp PRCNT &kp LCTRL &kp RCTRL &kp CARET &kp AMPS  &kp ASTRK &kp LPAR &kp RPAR &kp BSPC
-                &kp LCTRL &rgb_ug RGB_HUD &rgb_ug RGB_HUI &trans   &trans   &trans    &kp LALT  &kp RALT  &kp MINUS &kp EQUAL &kp LBKT  &kp RBKT &kp BSLH &kp GRAVE
-                &kp LSHFT &trans          &trans          &trans   &trans   &trans                        &kp UNDER &kp PLUS  &kp LBRC  &kp RBRC &kp PIPE &kp TILDE
-                                                          &kp LGUI &trans   &kp SPACE                     &kp RET   &trans    &kp RALT
+                &trans &kp F1     &kp F2     &kp F3     &kp F4     &kp F5     &none          &none          &kp F6      &kp F7      &kp F8      &kp F9      &kp F10     &trans
+                &trans &kp LS(N1) &kp LS(N2) &kp LS(N3) &kp LS(N4) &kp LS(N5) &none          &none          &kp LS(N6)  &kp LS(N7)  &kp LS(N8)  &kp LS(N9)  &kp LS(N0)  &none
+                &trans &kp RA(NUBS) &none    &kp NUBS   &kp LS(NUBS) &none                      &kp RA(N7)  &kp RA(N0)  &kp RA(N8)  &kp RA(N9)  &none       &trans
+                                      &trans &none &trans                     &trans &none &none
             >;
         };
 
-        extra_layer_1 {
-            display-name = "EXTRA 1";
+        uml_layer {
+            display-name = "UML";
+            // German umlaut / special-character row, same as QMK _UML.
             bindings = <
-                &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans
-                &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans
-                &trans &trans &trans &trans &trans &trans               &trans &trans &trans &trans &trans &trans
-                                     &trans &trans &trans               &trans &trans &trans       
+                &trans &kp RA(Q)  &none  &kp RA(E)     &none         &none  &none          &none          &none        &kp LBKT     &none        &kp SEMI &none  &trans
+                &trans &kp SQT    &none  &kp LS(GRAVE) &kp GRAVE     &none  &none          &none          &none        &kp RA(MINUS) &kp RA(RBKT) &none    &none  &none
+                &trans &none      &none  &kp EQUAL     &kp LS(EQUAL) &none                     &none        &kp RA(M)    &none        &none    &none  &trans
+                                      &trans &none &trans                     &trans &none &none
             >;
         };
 
-        extra_layer_2 {
-            display-name = "EXTRA 2";
+        nav_layer {
+            display-name = "NAV";
+            // Cursor block, clipboard shortcuts and numpad, same as QMK _NAV.
             bindings = <
-                &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans
-                &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans
-                &trans &trans &trans &trans &trans &trans               &trans &trans &trans &trans &trans &trans
-                                     &trans &trans &trans               &trans &trans &trans       
+                &kp ESC   &none      &kp HOME &kp UP   &kp END   &none         &none         &kp C_VOL_UP   &kp LC(Y) &kp N7    &kp N8    &kp N9    &kp LS(N0)    &trans
+                &trans    &kp LC(A)  &kp LEFT &kp DOWN &kp RIGHT &kp LC(LS(V)) &trans        &kp C_VOL_DN   &kp LC(Z) &kp N4    &kp N5    &kp N6    &kp KP_PLUS   &kp KP_MULTIPLY
+                &trans    &none      &kp LC(X) &kp LC(C) &kp LC(V) &kp LG(LS(S))                      &kp COMMA &kp N1    &kp N2    &kp N3    &kp KP_MINUS  &kp KP_DIVIDE
+                                      &trans &none &trans                     &trans &kp N0 &kp DOT
             >;
         };
 
-        extra_layer_3 {
-            display-name = "EXTRA 3";
+        gaming_nav_layer {
+            display-name = "GAMING NAV";
+            // Same shape as nav_layer, but Ctrl-based shortcuts swapped for Shift
+            // (WASD-friendly) versions, same as QMK _GAMING_NAV.
             bindings = <
-                &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans
-                &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans
-                &trans &trans &trans &trans &trans &trans               &trans &trans &trans &trans &trans &trans
-                                     &trans &trans &trans               &trans &trans &trans       
+                &kp ESC &none      &kp HOME &kp UP   &kp END   &kp LS(T) &none        &none         &none      &kp N7   &kp N8   &kp N9   &kp LS(N0)   &trans
+                &trans  &kp LS(A)  &kp LEFT &kp DOWN &kp RIGHT &kp PG_UP &none        &none         &none      &kp N4   &kp N5   &kp N6   &kp KP_PLUS  &kp KP_MULTIPLY
+                &trans  &none      &kp LS(X) &kp INS  &kp DEL   &kp PG_DN                  &kp COMMA  &kp N1   &kp N2   &kp N3   &kp KP_MINUS &kp KP_DIVIDE
+                                    &none &trans &none                     &none &kp N0 &kp DOT
             >;
         };
 
-        extra_layer_4 {
-            display-name = "EXTRA 4";
+        settings_layer {
+            display-name = "SETTINGS";
+            // Not present in the QMK source - ZMK needs somewhere to put BT
+            // profile switching / bootloader / factory reset. Reached by holding
+            // both thumb layer keys together (see combo_settings_layer above).
             bindings = <
-                &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans
-                &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans
-                &trans &trans &trans &trans &trans &trans               &trans &trans &trans &trans &trans &trans
-                                     &trans &trans &trans               &trans &trans &trans       
-            >;
-        };
-
-        extra_layer_5 {
-            display-name = "EXTRA 5";
-            bindings = <
-                &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans
-                &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans
-                &trans &trans &trans &trans &trans &trans               &trans &trans &trans &trans &trans &trans
-                                     &trans &trans &trans               &trans &trans &trans       
-            >;
-        };
-
-        extra_layer_6 {
-            display-name = "EXTRA 6";
-            bindings = <
-                &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans
-                &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans &trans
-                &trans &trans &trans &trans &trans &trans               &trans &trans &trans &trans &trans &trans
-                                     &trans &trans &trans               &trans &trans &trans       
+                &none &none       &none       &none       &none       &none &bootloader      &none &none &none &none &none &none &none
+                &none &bt BT_SEL 0 &bt BT_SEL 1 &bt BT_SEL 2 &bt BT_SEL 3 &bt BT_SEL 4 &sys_reset      &none &none &none &none &none &none &none
+                &none &bt BT_CLR  &none       &none       &none       &none                &none &none &none &none &none &none
+                                    &none &none &none                  &none &none &none
             >;
         };
     };
