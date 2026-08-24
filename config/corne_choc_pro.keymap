@@ -31,18 +31,6 @@
 };
 
 / {
-    behaviors {
-        // Sticky layer behavior that holds the layer active until all modifiers are released
-        sl_mods: sticky_layer_mods {
-            compatible = "zmk,behavior-sticky-key";
-            #binding-cells = <1>;
-            label = "STICKY_LAYER_MODS";
-            bindings = <&mo>;
-            release-after-mods;
-            ignore-modifiers;
-        };
-    };
-
     macros {
         settings_enter: settings_enter {
             compatible = "zmk,behavior-macro";
@@ -56,6 +44,30 @@
             #binding-cells = <0>;
             // Explicitly turn RGB OFF and return to the base layer
             bindings = <&rgb_ug RGB_OFF>, <&to 0>;
+        };
+
+        // Fix for https://github.com/zmkfirmware/zmk/issues/759 - when a
+        // modifier and a base key are sent as a single &kp MOD(key) chord,
+        // ZMK fires both HID reports back-to-back with ~no gap, and some
+        // hosts/drivers occasionally drop the modifier, delivering only the
+        // bare key. This is the ZMK equivalent of QMK's ALGR() which never
+        // showed this because QMK paces its reports differently.
+        //
+        // ralt_tap explicitly presses RALT, waits a few ms (long enough for
+        // the host to register the modifier-down report), taps the key, then
+        // waits again before releasing RALT. Use it as &ralt_tap KEYCODE
+        // instead of &kp RA(KEYCODE).
+        ralt_tap: ralt_tap {
+            compatible = "zmk,behavior-macro-one-param";
+            #binding-cells = <1>;
+            wait-ms = <15>;
+            tap-ms = <15>;
+            bindings
+                = <&macro_press &kp RALT>
+                , <&macro_param_1to1>
+                , <&macro_tap &kp MACRO_PLACEHOLDER>
+                , <&macro_release &kp RALT>
+                ;
         };
     };
 };
@@ -82,13 +94,13 @@
             // -------------------------------------------------------------------------------------------------------------------
             // | TAB  |  Q  |  W  |  E  |  R  |  T  | LGUI |  | PSCR |  Y  |  U  |  I  |  O  |  P    | BSPC  |
             // | CTRL |  A  |  S  |  D  |  F  |  G  | DEL  |  | DEL  |  H  |  J  |  K  |  L  | NUHS  | MINUS |
-            // | SHFT |  Z  |  X  |  C  |  V  |  B  |              |  N  |  M  | ,   | .   | /     | SHFT  |
-            //                     | ALT | NAV | SPC |              | ENT | UML | SYM |
+            // | SHFT |  Z  |  X  |  C  |  V  |  B  |             |  N  |  M  | ,   | .   | /     | SHFT  |
+            //                    | ALT | NAV | SPC |             | ENT | UML | SYM |
             bindings = <
                 &kp TAB   &kp Q &kp W &kp E &kp R &kp T &kp LGUI    &kp PSCRN &kp Y &kp U &kp I     &kp O   &kp P    &kp BSPC
                 &kp LCTRL &kp A &kp S &kp D &kp F &kp G &kp DEL     &kp DEL   &kp H &kp J &kp K     &kp L   &kp NUHS &kp MINUS
-                &kp LSHFT &kp Z &kp X &kp C &kp V &kp B                       &kp N &kp M &kp COMMA &kp DOT &kp FSLH &kp RSHFT
-                                      &kp LALT &sl_mods 3 &kp SPACE               &kp RET &sl_mods 2 &sl_mods 1
+                &kp LSHFT &kp Z &kp X &kp C &kp V &kp B                      &kp N &kp M &kp COMMA &kp DOT &kp FSLH &kp RSHFT
+                                      &kp LALT &sl 3 &kp SPACE               &kp RET &sl 2 &sl 1
             >;
             sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &inc_dec_kp PG_UP PG_DN &inc_dec_kp C_PREV C_NEXT &inc_dec_kp C_VOL_DN C_VOL_UP>;
         };
@@ -99,7 +111,7 @@
             bindings = <
                 &trans &kp F1     &kp F2     &kp F3     &kp F4     &kp F5     &none          &none          &kp F6      &kp F7      &kp F8      &kp F9      &kp F10     &trans
                 &trans &kp LS(N1) &kp LS(N2) &kp LS(N3) &kp LS(N4) &kp LS(N5) &none          &none          &kp LS(N6)  &kp LS(N7)  &kp LS(N8)  &kp LS(N9)  &kp LS(N0)  &none
-                &trans &kp RA(NUBS) &none    &kp NUBS   &kp LS(NUBS) &none                    &kp RA(N7)  &kp RA(N0)  &kp RA(N8)  &kp RA(N9)  &none       &trans
+                &trans &ralt_tap NUBS &none  &kp NUBS   &kp LS(NUBS) &none                      &ralt_tap N7 &ralt_tap N0 &ralt_tap N8 &ralt_tap N9 &none       &trans
                                       &trans &none &trans                     &trans &none &none
             >;
         };
@@ -108,9 +120,9 @@
             display-name = "UML";
             // German umlaut / special-character row, same as QMK _UML.
             bindings = <
-                &trans &kp RA(Q)  &none  &kp RA(E)     &none         &none  &none          &none          &none        &kp LBKT     &none        &kp SEMI &none  &trans
-                &trans &kp SQT    &none  &kp LS(GRAVE) &kp GRAVE     &none  &none          &none          &none        &kp RA(MINUS) &kp RA(RBKT) &none    &none  &none
-                &trans &none      &none  &kp EQUAL     &kp LS(EQUAL) &none                        &none        &kp RA(M)    &none        &none    &none  &trans
+                &trans &ralt_tap Q &none &ralt_tap E   &none         &none  &none          &none          &none        &kp LBKT     &none        &kp SEMI &none  &trans
+                &trans &kp SQT    &none  &kp LS(GRAVE) &kp GRAVE     &none  &none          &none          &none        &ralt_tap MINUS &ralt_tap RBKT &none  &none  &none
+                &trans &none      &none  &kp EQUAL     &kp LS(EQUAL) &none                     &none        &ralt_tap M  &none        &none    &none  &trans
                                       &trans &none &trans                     &trans &none &none
             >;
         };
@@ -121,7 +133,7 @@
             bindings = <
                 &kp ESC   &none      &kp HOME &kp UP   &kp END   &none         &none         &kp C_VOL_UP   &kp LC(Y) &kp N7    &kp N8    &kp N9    &kp LS(N0)    &trans
                 &trans    &kp LC(A)  &kp LEFT &kp DOWN &kp RIGHT &kp LC(LS(V)) &trans        &kp C_VOL_DN   &kp LC(Z) &kp N4    &kp N5    &kp N6    &kp KP_PLUS   &kp KP_MULTIPLY
-                &trans    &none      &kp LC(X) &kp LC(C) &kp LC(V) &kp LG(LS(S))                    &kp COMMA &kp N1    &kp N2    &kp N3    &kp KP_MINUS  &kp KP_DIVIDE
+                &trans    &none      &kp LC(X) &kp LC(C) &kp LC(V) &kp LG(LS(S))                      &kp COMMA &kp N1    &kp N2    &kp N3    &kp KP_MINUS  &kp KP_DIVIDE
                                       &trans &none &trans                     &trans &kp N0 &kp DOT
             >;
         };
