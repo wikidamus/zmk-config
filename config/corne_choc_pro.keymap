@@ -4,53 +4,16 @@
  * SPDX-License-Identifier: MIT
  *
  * Ported from a QMK keymap.c (German ISO Corne Choc Pro, LAYOUT_split_3x6_3_ex2).
- * All RGB matrix / underglow logic from the QMK source has been dropped -
- * ZMK simply has no equivalent concept here, so there was nothing to "convert",
- * it's just omitted.
  *
- * Layer order: 0 base, 1 sym, 2 uml, 3 nav, 4 settings, 5 mac_mods,
- *              6 sym_ios, 7 uml_ios, 8 base_ios
+ * Layer order (fixed for ZMK priority stack):
+ *   0 base, 1 base_ios, 2 sym, 3 uml, 4 sym_ios, 5 uml_ios,
+ *   6 nav, 7 mac_mods, 8 settings
  *
  * --- Windows / iPad switching ---
  * BT profile 2 is the iPad; profiles 0, 1, 3, 4 are treated as Windows.
- * Selecting a profile in SETTINGS now automatically:
- *   - switches the default (base) layer: 0 for Windows, 8 (base_ios) for iPad
- *   - turns mac_mods (layer 5) on for iPad, off for Windows
- * base_ios is identical to base except its SYM/UML thumb keys point at
- * sym_ios (6) / uml_ios (7) instead of sym (1) / uml (2). Everything else
- * (letters, NAV, SETTINGS) is shared between both modes.
- *
- * mac_mods (layer 5) swaps a handful of NAV-layer Ctrl-based clipboard/undo
- * shortcuts for their Cmd/GUI equivalents, since iPadOS/macOS use Cmd for
- * these, not Ctrl. It's driven automatically by BT profile selection now,
- * but SETTINGS still has a manual &tog 5 key you can use to override it
- * without changing profiles (e.g. testing) - just note it can fall out of
- * sync with the automatic state if you use it that way.
- *
- * sym_ios / uml_ios are copies of sym / uml with every AltGr(RALT)-based
- * German special character re-mapped to its Option(LALT)-based macOS/iPadOS
- * equivalent - the two OSes put these on genuinely different keys, it's not
- * just a modifier-name difference:
- *
- *   char   Windows (AltGr+)   macOS/iPadOS German (Option+)
- *   @      Q                  L
- *   €      E                  E
- *   {      7                  8
- *   [      8                  5
- *   ]      9                  6
- *   }      0                  9
- *   |      NUBS (<>)          7
- *   \      MINUS (ß-pos)      Shift+7
- *   ~      RBKT (+ pos)       N
- *   µ      M                  M
- *
- * Modifier notes (kept 1:1 with the QMK source, since the actual German
- * characters come from your OS keyboard layout, not the firmware):
- *   QMK ALGR(kc)  -> ZMK RA(kc)   (right Alt / AltGr)
- *   QMK LSFT(kc)  -> ZMK LS(kc)
- *   QMK LCTL(kc)  -> ZMK LC(kc)
- *   QMK SGUI(kc)  -> ZMK LG(LS(kc))   (Win+Shift)
- *   QMK RCS(kc)   -> ZMK LC(LS(kc))   (Ctrl+Shift, e.g. "paste as text")
+ * Selecting a profile in SETTINGS automatically:
+ *   - switches default base layer: 0 for Windows, 1 for iPad
+ *   - turns mac_mods (layer 7) on for iPad, off for Windows
  */
 
 #include <behaviors.dtsi>
@@ -66,10 +29,6 @@
 
 / {
     behaviors {
-        // Deterministic on/off versions of &tog, used so selecting a BT
-        // profile always leaves mac_mods in a known state instead of just
-        // flipping whatever it happened to be before.
-        // https://zmk.dev/docs/keymaps/behaviors/layers#toggle-layer
         tog_on: toggle_layer_on_only {
             compatible = "zmk,behavior-toggle-layer";
             #binding-cells = <1>;
@@ -89,32 +48,15 @@
         settings_enter: settings_enter {
             compatible = "zmk,behavior-macro";
             #binding-cells = <0>;
-            // Turn RGB ON and stack the settings layer on top of whichever
-            // base (Windows or iPad) is currently active - &tog, not &to, so
-            // exiting doesn't forget which base you were on.
-            bindings = <&rgb_ug RGB_ON>, <&tog 4>;
+            bindings = <&rgb_ug RGB_ON>, <&tog 8>;
         };
 
         settings_exit: settings_exit {
             compatible = "zmk,behavior-macro";
             #binding-cells = <0>;
-            // Turn RGB OFF and un-stack the settings layer, revealing
-            // whichever base layer was active underneath.
-            bindings = <&rgb_ug RGB_OFF>, <&tog 4>;
+            bindings = <&rgb_ug RGB_OFF>, <&tog 8>;
         };
 
-        // Fix for https://github.com/zmkfirmware/zmk/issues/759 - when a
-        // modifier and a base key are sent as a single &kp MOD(key) chord,
-        // ZMK fires both HID reports back-to-back with ~no gap, and some
-        // hosts/drivers occasionally drop the modifier, delivering only the
-        // bare key. This is the ZMK equivalent of QMK's ALGR()/LALT() which
-        // never showed this because QMK paces its reports differently.
-        //
-        // ralt_tap / lalt_tap explicitly press RALT/LALT, wait a few ms
-        // (long enough for the host to register the modifier-down report),
-        // tap the key, then wait again before releasing. Use as
-        // &ralt_tap KEYCODE / &lalt_tap KEYCODE instead of &kp RA(KEYCODE) /
-        // &kp LA(KEYCODE).
         ralt_tap: ralt_tap {
             compatible = "zmk,behavior-macro-one-param";
             #binding-cells = <1>;
@@ -141,8 +83,6 @@
                 ;
         };
 
-        // Same idea, but for the one iOS character that needs Option+Shift
-        // together (the backslash equivalent, Option+Shift+7).
         lalt_shift_tap: lalt_shift_tap {
             compatible = "zmk,behavior-macro-one-param";
             #binding-cells = <1>;
@@ -158,40 +98,34 @@
                 ;
         };
 
-        // BT profile switchers used in SETTINGS. Each one selects the radio
-        // profile, snaps the default layer to the matching base, and pins
-        // mac_mods to the matching state - in that order, since &to resets
-        // every non-default layer (including one you just &tog'd on), so
-        // the &tog_on/&tog_off has to come *after* the &to.
         bt_prof0: bt_prof0 {
             compatible = "zmk,behavior-macro";
             #binding-cells = <0>;
-            bindings = <&bt BT_SEL 0>, <&rgb_ug RGB_OFF>, <&to 0>, <&tog_off 5>;
+            bindings = <&bt BT_SEL 0>, <&rgb_ug RGB_OFF>, <&to 0>, <&tog_off 7>;
         };
 
         bt_prof1: bt_prof1 {
             compatible = "zmk,behavior-macro";
             #binding-cells = <0>;
-            bindings = <&bt BT_SEL 1>, <&rgb_ug RGB_OFF>, <&to 0>, <&tog_off 5>;
+            bindings = <&bt BT_SEL 1>, <&rgb_ug RGB_OFF>, <&to 0>, <&tog_off 7>;
         };
 
         bt_prof2: bt_prof2 {
             compatible = "zmk,behavior-macro";
             #binding-cells = <0>;
-            // The iPad profile.
-            bindings = <&bt BT_SEL 2>, <&rgb_ug RGB_OFF>, <&to 8>, <&tog_on 5>;
+            bindings = <&bt BT_SEL 2>, <&rgb_ug RGB_OFF>, <&to 1>, <&tog_on 7>;
         };
 
         bt_prof3: bt_prof3 {
             compatible = "zmk,behavior-macro";
             #binding-cells = <0>;
-            bindings = <&bt BT_SEL 3>, <&rgb_ug RGB_OFF>, <&to 0>, <&tog_off 5>;
+            bindings = <&bt BT_SEL 3>, <&rgb_ug RGB_OFF>, <&to 0>, <&tog_off 7>;
         };
 
         bt_prof4: bt_prof4 {
             compatible = "zmk,behavior-macro";
             #binding-cells = <0>;
-            bindings = <&bt BT_SEL 4>, <&rgb_ug RGB_OFF>, <&to 0>, <&tog_off 5>;
+            bindings = <&bt BT_SEL 4>, <&rgb_ug RGB_OFF>, <&to 0>, <&tog_off 7>;
         };
     };
 };
@@ -200,14 +134,11 @@
     combos {
         compatible = "zmk,combos";
 
-        // Hold TAB+ENT together to reach a small settings layer with BT
-        // profile selection / bootloader / reset. Also turns LEDs on.
-        // Works from either base layer (Windows = 0, iPad = 8).
         combo_settings_layer {
             timeout-ms = <50>;
             key-positions = <0 43>;
             bindings = <&settings_enter>;
-            layers = <0 4 8>;
+            layers = <0 1 8>;
         };
     };
 
@@ -216,23 +147,28 @@
 
         base_layer {
             display-name = "BASE";
-            // -------------------------------------------------------------------------------------------------------------------
-            // | TAB  |  Q  |  W  |  E  |  R  |  T  | LGUI |  | PSCR |  Y  |  U  |  I  |  O  |  P    | BSPC  |
-            // | CTRL |  A  |  S  |  D  |  F  |  G  | DEL  |  | DEL  |  H  |  J  |  K  |  L  | NUHS  | MINUS |
-            // | SHFT |  Z  |  X  |  C  |  V  |  B  |             |  N  |  M  | ,   | .   | /     | SHFT  |
-            //                    | ALT | NAV | SPC |             | ENT | UML | SYM |
             bindings = <
                 &kp TAB   &kp Q &kp W &kp E &kp R &kp T &kp LGUI    &kp PSCRN &kp Y &kp U &kp I     &kp O   &kp P    &kp BSPC
                 &kp LCTRL &kp A &kp S &kp D &kp F &kp G &kp DEL     &kp DEL   &kp H &kp J &kp K     &kp L   &kp NUHS &kp MINUS
                 &kp LSHFT &kp Z &kp X &kp C &kp V &kp B                      &kp N &kp M &kp COMMA &kp DOT &kp FSLH &kp RSHFT
-                                      &kp LALT &sl 3 &kp SPACE               &kp RET &sl 2 &sl 1
+                                      &kp LALT &sl 6 &kp SPACE               &kp RET &sl 3 &sl 2
+            >;
+            sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &inc_dec_kp PG_UP PG_DN &inc_dec_kp C_PREV C_NEXT &inc_dec_kp C_VOL_DN C_VOL_UP>;
+        };
+
+        base_ios_layer {
+            display-name = "BASE_iOS";
+            bindings = <
+                &kp TAB   &kp Q &kp W &kp E &kp R &kp T &kp LGUI    &kp PSCRN &kp Y &kp U &kp I     &kp O   &kp P    &kp BSPC
+                &kp LCTRL &kp A &kp S &kp D &kp F &kp G &kp DEL     &kp DEL   &kp H &kp J &kp K     &kp L   &kp NUHS &kp MINUS
+                &kp LSHFT &kp Z &kp X &kp C &kp V &kp B                      &kp N &kp M &kp COMMA &kp DOT &kp FSLH &kp RSHFT
+                                      &kp LALT &sl 6 &kp SPACE               &kp RET &sl 5 &sl 4
             >;
             sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &inc_dec_kp PG_UP PG_DN &inc_dec_kp C_PREV C_NEXT &inc_dec_kp C_VOL_DN C_VOL_UP>;
         };
 
         sym_layer {
             display-name = "SYM";
-            // F-keys + shifted number row (symbols) + AltGr NUBS row, same as QMK _SYM.
             bindings = <
                 &trans &kp F1     &kp F2     &kp F3     &kp F4     &kp F5     &none          &none          &kp F6      &kp F7      &kp F8      &kp F9      &kp F10     &trans
                 &trans &kp LS(N1) &kp LS(N2) &kp LS(N3) &kp LS(N4) &kp LS(N5) &none          &none          &kp LS(N6)  &kp LS(N7)  &kp LS(N8)  &kp LS(N9)  &kp LS(N0)  &none
@@ -243,7 +179,6 @@
 
         uml_layer {
             display-name = "UML";
-            // German umlaut / special-character row, same as QMK _UML.
             bindings = <
                 &trans &ralt_tap Q &none &ralt_tap E   &none         &none  &none          &none          &none        &kp LBKT     &none        &kp SEMI &none  &trans
                 &trans &kp SQT    &none  &kp LS(GRAVE) &kp GRAVE     &none  &none          &none          &none        &ralt_tap MINUS &ralt_tap RBKT &none  &none  &none
@@ -252,67 +187,8 @@
             >;
         };
 
-        nav_layer {
-            display-name = "NAV";
-            // Cursor block, clipboard shortcuts and numpad, same as QMK _NAV.
-            bindings = <
-                &kp ESC   &none      &kp HOME &kp UP   &kp END   &none         &none         &kp C_VOL_UP   &kp LC(Y) &kp N7    &kp N8    &kp N9    &kp LS(N0)    &trans
-                &trans    &kp LC(A)  &kp LEFT &kp DOWN &kp RIGHT &kp LC(LS(V)) &trans        &kp C_VOL_DN   &kp LC(Z) &kp N4    &kp N5    &kp N6    &kp KP_PLUS   &kp KP_MULTIPLY
-                &trans    &none      &kp LC(X) &kp LC(C) &kp LC(V) &kp LG(LS(S))                      &kp COMMA &kp N1    &kp N2    &kp N3    &kp KP_MINUS  &kp KP_DIVIDE
-                                      &trans &none &trans                     &trans &kp N0 &kp DOT
-            >;
-        };
-
-        settings_layer {
-            display-name = "SETTINGS";
-            // Not present in the QMK source - ZMK needs somewhere to put BT
-            // profile switching / bootloader / factory reset. Reached by holding
-            // both thumb layer keys together (see combo_settings_layer above).
-            // Profile 2 = iPad (auto-switches to base_ios + mac_mods on).
-            // Profiles 0/1/3/4 = Windows (base + mac_mods off).
-            bindings = <
-                &settings_exit &none    &none    &none    &none    &none &bootloader      &tog 5 &none &none &none &none &none &none
-                &none          &bt_prof0 &bt_prof1 &bt_prof2 &bt_prof3 &bt_prof4 &sys_reset      &none &none &none &none &none &none &none
-                &none          &bt BT_CLR  &none       &none       &none       &none                &none &none &none &none &none &none
-                                    &none &none &none                  &none &none &none
-            >;
-        };
-
-        mac_mods_layer {
-            display-name = "MACMOD";
-            // Auto-driven by BT profile selection now (see bt_prof2/bt_prof0
-            // etc. above); SETTINGS also keeps a manual &tog 5 as an escape
-            // hatch. Stacks on top of every other layer (highest layer
-            // number = highest priority), so while it's on it silently swaps
-            // the handful of NAV-layer Ctrl-based clipboard/undo shortcuts
-            // for their Cmd/GUI equivalents, which is what iPadOS (and
-            // macOS) actually listen for - Ctrl+A/C/V/X/Z/Y are Windows-only
-            // conventions and mostly do nothing on iPadOS. Everything else
-            // is &trans so it never interferes with BASE/SYM/UML or the rest
-            // of NAV.
-            //
-            //   NAV key      Windows        iPad/Mac
-            //   redo         LC(Y)      ->  LG(LS(Z))
-            //   select all   LC(A)      ->  LG(A)
-            //   paste plain  LC(LS(V))  ->  LG(LS(V))
-            //   undo         LC(Z)      ->  LG(Z)
-            //   cut          LC(X)      ->  LG(X)
-            //   copy         LC(C)      ->  LG(C)
-            //   paste        LC(V)      ->  LG(V)
-            bindings = <
-                &trans &trans &trans &trans &trans &trans &trans        &trans &kp LG(LS(Z)) &trans &trans &trans &trans &trans
-                &trans &kp LG(A) &trans &trans &trans &kp LG(LS(V)) &trans    &trans &kp LG(Z) &trans &trans &trans &trans &trans
-                &trans &trans &kp LG(X) &kp LG(C) &kp LG(V) &trans                  &trans &trans &trans &trans &trans &trans
-                                    &trans &trans &trans                  &trans &trans &trans
-            >;
-        };
-
         sym_ios_layer {
             display-name = "SYM_iOS";
-            // Same as SYM, but the AltGr row is re-mapped to macOS/iPadOS
-            // Option-key positions (see the table in the header comment).
-            // F-keys and the shifted number row are unchanged - those are
-            // plain ASCII and identical on both OSes.
             bindings = <
                 &trans &kp F1     &kp F2     &kp F3     &kp F4     &kp F5     &none          &none          &kp F6      &kp F7      &kp F8      &kp F9      &kp F10     &trans
                 &trans &kp LS(N1) &kp LS(N2) &kp LS(N3) &kp LS(N4) &kp LS(N5) &none          &none          &kp LS(N6)  &kp LS(N7)  &kp LS(N8)  &kp LS(N9)  &kp LS(N0)  &none
@@ -323,12 +199,6 @@
 
         uml_ios_layer {
             display-name = "UML_iOS";
-            // Same as UML, but the AltGr row is re-mapped to macOS/iPadOS
-            // Option-key positions (see the table in the header comment).
-            // The non-AltGr positions (SQT/GRAVE/EQUAL/LBKT/SEMI) are
-            // unchanged - those are plain/shifted keys that come from the
-            // iPad's own German hardware-keyboard layout setting, same as
-            // on Windows.
             bindings = <
                 &trans &lalt_tap L &none &lalt_tap E   &none         &none  &none          &none          &none        &kp LBKT     &none        &kp SEMI &none  &trans
                 &trans &kp SQT    &none  &kp LS(GRAVE) &kp GRAVE     &none  &none          &none          &none        &lalt_shift_tap N7 &lalt_tap N &none  &none  &none
@@ -337,19 +207,34 @@
             >;
         };
 
-        base_ios_layer {
-            display-name = "BASE_iOS";
-            // Identical to BASE except the SYM/UML thumb keys point at
-            // sym_ios (6) / uml_ios (7) instead of sym (1) / uml (2).
-            // Auto-selected as the default layer when BT profile 2 (iPad)
-            // is chosen in SETTINGS (bt_prof2 above).
+        nav_layer {
+            display-name = "NAV";
             bindings = <
-                &kp TAB   &kp Q &kp W &kp E &kp R &kp T &kp LGUI    &kp PSCRN &kp Y &kp U &kp I     &kp O   &kp P    &kp BSPC
-                &kp LCTRL &kp A &kp S &kp D &kp F &kp G &kp DEL     &kp DEL   &kp H &kp J &kp K     &kp L   &kp NUHS &kp MINUS
-                &kp LSHFT &kp Z &kp X &kp C &kp V &kp B                      &kp N &kp M &kp COMMA &kp DOT &kp FSLH &kp RSHFT
-                                      &kp LALT &sl 3 &kp SPACE               &kp RET &sl 7 &sl 6
+                &kp ESC   &none      &kp HOME &kp UP   &kp END   &none         &none         &kp C_VOL_UP   &kp LC(Y) &kp N7    &kp N8    &kp N9    &kp LS(N0)    &trans
+                &trans    &kp LC(A)  &kp LEFT &kp DOWN &kp RIGHT &kp LC(LS(V)) &trans        &kp C_VOL_DN   &kp LC(Z) &kp N4    &kp N5    &kp N6    &kp KP_PLUS   &kp KP_MULTIPLY
+                &trans    &none      &kp LC(X) &kp LC(C) &kp LC(V) &kp LG(LS(S))                      &kp COMMA &kp N1    &kp N2    &kp N3    &kp KP_MINUS  &kp KP_DIVIDE
+                                      &trans &none &trans                     &trans &kp N0 &kp DOT
             >;
-            sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &inc_dec_kp PG_UP PG_DN &inc_dec_kp C_PREV C_NEXT &inc_dec_kp C_VOL_DN C_VOL_UP>;
+        };
+
+        mac_mods_layer {
+            display-name = "MACMOD";
+            bindings = <
+                &trans &trans &trans &trans &trans &trans &trans        &trans &kp LG(LS(Z)) &trans &trans &trans &trans &trans
+                &trans &kp LG(A) &trans &trans &trans &kp LG(LS(V)) &trans    &trans &kp LG(Z) &trans &trans &trans &trans &trans
+                &trans &trans &kp LG(X) &kp LG(C) &kp LG(V) &trans                  &trans &trans &trans &trans &trans &trans
+                                    &trans &trans &trans                  &trans &trans &trans
+            >;
+        };
+
+        settings_layer {
+            display-name = "SETTINGS";
+            bindings = <
+                &settings_exit &none    &none    &none    &none    &none &bootloader      &tog 7 &none &none &none &none &none &none
+                &none          &bt_prof0 &bt_prof1 &bt_prof2 &bt_prof3 &bt_prof4 &sys_reset      &none &none &none &none &none &none &none
+                &none          &bt BT_CLR  &none       &none       &none       &none                &none &none &none &none &none &none
+                                    &none &none &none                  &none &none &none
+            >;
         };
     };
 };
