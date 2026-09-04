@@ -5,15 +5,15 @@
  *
  * Ported from a QMK keymap.c (German ISO Corne Choc Pro, LAYOUT_split_3x6_3_ex2).
  *
- * Layer order (fixed for ZMK priority stack):
+ * Layer order:
  *   0 base, 1 base_ios, 2 sym, 3 uml, 4 sym_ios, 5 uml_ios,
- *   6 nav, 7 mac_mods, 8 settings
+ *   6 nav, 7 nav_ios, 8 settings
  *
  * --- Windows / iPad switching ---
  * BT profile 2 is the iPad; profiles 0, 1, 3, 4 are treated as Windows.
- * Selecting a profile in SETTINGS automatically:
- *   - switches default base layer: 0 for Windows, 1 for iPad
- *   - turns mac_mods (layer 7) on for iPad, off for Windows
+ * Selecting a profile in SETTINGS automatically switches the default base layer: 
+ *   - 0 for Windows (points to standard sym/uml/nav layers)
+ *   - 1 for iPad (points to ios-specific sym/uml/nav layers)
  */
 
 #include <behaviors.dtsi>
@@ -28,22 +28,6 @@
 };
 
 / {
-    behaviors {
-        tog_on: toggle_layer_on_only {
-            compatible = "zmk,behavior-toggle-layer";
-            #binding-cells = <1>;
-            display-name = "Toggle Layer On";
-            toggle-mode = "on";
-        };
-
-        tog_off: toggle_layer_off_only {
-            compatible = "zmk,behavior-toggle-layer";
-            #binding-cells = <1>;
-            display-name = "Toggle Layer Off";
-            toggle-mode = "off";
-        };
-    };
-
     macros {
         settings_enter: settings_enter {
             compatible = "zmk,behavior-macro";
@@ -101,31 +85,32 @@
         bt_prof0: bt_prof0 {
             compatible = "zmk,behavior-macro";
             #binding-cells = <0>;
-            bindings = <&bt BT_SEL 0>, <&rgb_ug RGB_OFF>, <&to 0>, <&tog_off 7>;
+            bindings = <&bt BT_SEL 0>, <&rgb_ug RGB_OFF>, <&to 0>;
         };
 
         bt_prof1: bt_prof1 {
             compatible = "zmk,behavior-macro";
             #binding-cells = <0>;
-            bindings = <&bt BT_SEL 1>, <&rgb_ug RGB_OFF>, <&to 0>, <&tog_off 7>;
+            bindings = <&bt BT_SEL 1>, <&rgb_ug RGB_OFF>, <&to 0>;
         };
 
         bt_prof2: bt_prof2 {
             compatible = "zmk,behavior-macro";
             #binding-cells = <0>;
-            bindings = <&bt BT_SEL 2>, <&rgb_ug RGB_OFF>, <&to 1>, <&tog_on 7>;
+            // The iPad profile switches base layout to layer 1.
+            bindings = <&bt BT_SEL 2>, <&rgb_ug RGB_OFF>, <&to 1>;
         };
 
         bt_prof3: bt_prof3 {
             compatible = "zmk,behavior-macro";
             #binding-cells = <0>;
-            bindings = <&bt BT_SEL 3>, <&rgb_ug RGB_OFF>, <&to 0>, <&tog_off 7>;
+            bindings = <&bt BT_SEL 3>, <&rgb_ug RGB_OFF>, <&to 0>;
         };
 
         bt_prof4: bt_prof4 {
             compatible = "zmk,behavior-macro";
             #binding-cells = <0>;
-            bindings = <&bt BT_SEL 4>, <&rgb_ug RGB_OFF>, <&to 0>, <&tog_off 7>;
+            bindings = <&bt BT_SEL 4>, <&rgb_ug RGB_OFF>, <&to 0>;
         };
     };
 };
@@ -138,8 +123,7 @@
             timeout-ms = <50>;
             key-positions = <0 43>;
             bindings = <&settings_enter>;
-            // Added layer 7 (mac_mods) so the combo still triggers when iPad profile is active
-            layers = <0 1 7 8>;
+            layers = <0 1 8>;
         };
     };
 
@@ -159,11 +143,12 @@
 
         base_ios_layer {
             display-name = "BASE_iOS";
+            // iPad Base points to iOS specific NAV (sl 7), UML (sl 5), and SYM (sl 4)
             bindings = <
                 &kp TAB   &kp Q &kp W &kp E &kp R &kp T &kp LGUI    &kp PSCRN &kp Y &kp U &kp I     &kp O   &kp P    &kp BSPC
                 &kp LCTRL &kp A &kp S &kp D &kp F &kp G &kp DEL     &kp DEL   &kp H &kp J &kp K     &kp L   &kp NUHS &kp MINUS
                 &kp LSHFT &kp Z &kp X &kp C &kp V &kp B                      &kp N &kp M &kp COMMA &kp DOT &kp FSLH &kp RSHFT
-                                      &kp LALT &sl 6 &kp SPACE               &kp RET &sl 5 &sl 4
+                                      &kp LALT &sl 7 &kp SPACE               &kp RET &sl 5 &sl 4
             >;
             sensor-bindings = <&inc_dec_kp C_VOL_DN C_VOL_UP &inc_dec_kp PG_UP PG_DN &inc_dec_kp C_PREV C_NEXT &inc_dec_kp C_VOL_DN C_VOL_UP>;
         };
@@ -218,20 +203,22 @@
             >;
         };
 
-        mac_mods_layer {
-            display-name = "MACMOD";
+        nav_ios_layer {
+            display-name = "NAV_iOS";
+            // Dedicated iOS Nav layer mapping Ctrl modifiers to Cmd modifiers
             bindings = <
-                &trans &trans &trans &trans &trans &trans &trans        &trans &kp LG(LS(Z)) &trans &trans &trans &trans &trans
-                &trans &kp LG(A) &trans &trans &trans &kp LG(LS(V)) &trans    &trans &kp LG(Z) &trans &trans &trans &trans &trans
-                &trans &trans &kp LG(X) &kp LG(C) &kp LG(V) &trans                  &trans &trans &trans &trans &trans &trans
-                                    &trans &trans &trans                  &trans &trans &trans
+                &kp ESC   &none      &kp HOME &kp UP   &kp END   &none         &none         &kp C_VOL_UP   &kp LG(LS(Z)) &kp N7    &kp N8    &kp N9    &kp LS(N0)    &trans
+                &trans    &kp LG(A)  &kp LEFT &kp DOWN &kp RIGHT &kp LG(LS(V)) &trans        &kp C_VOL_DN   &kp LG(Z)     &kp N4    &kp N5    &kp N6    &kp KP_PLUS   &kp KP_MULTIPLY
+                &trans    &none      &kp LG(X)  &kp LG(C)  &kp LG(V)  &kp LG(LS(S))                   &kp COMMA     &kp N1    &kp N2    &kp N3    &kp KP_MINUS  &kp KP_DIVIDE
+                                      &trans &none &trans                     &trans &kp N0 &kp DOT
             >;
         };
 
         settings_layer {
             display-name = "SETTINGS";
+            // Manual mac mod toggle removed since base layout strictly defines the nav variant used
             bindings = <
-                &settings_exit &none    &none    &none    &none    &none &bootloader      &tog 7 &none &none &none &none &none &none
+                &settings_exit &none    &none    &none    &none    &none &bootloader      &none &none &none &none &none &none &none
                 &none          &bt_prof0 &bt_prof1 &bt_prof2 &bt_prof3 &bt_prof4 &sys_reset      &none &none &none &none &none &none &none
                 &none          &bt BT_CLR  &none       &none       &none       &none                &none &none &none &none &none &none
                                     &none &none &none                  &none &none &none
